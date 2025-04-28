@@ -18,6 +18,8 @@
 #include "mm.h"
 #include "memlib.h"
 
+
+
 /*
 가용 리스트 조작을 위한 기본 상수와 매크로
 */
@@ -62,6 +64,15 @@ team_t team = {
     "",
     /* Second member's email address (leave blank if none) */
     ""};
+
+/* 항상 heap의 시작을 가리키는 포인터 */
+static char *heap_listp = NULL;
+
+/* 함수 프로토타입 선언 */
+static void *extend_heap(size_t words);
+static void *coalesce(void *bp);
+static void *find_fit(size_t asize);
+static void place(void *bp, size_t asize);
 
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
@@ -122,15 +133,32 @@ static void *extend_heap(size_t words)
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
+    size_t asize;      /* Adjusted block size */
+    size_t extendsize; /* Amount to extend heap if no fit */
+    char *bp;
+
+    /* Ignore spurious requests */
+    if (size == 0)
         return NULL;
+
+    /* Adjust block size to include overhead and alignment reqs. */
+    if (size <= DSIZE)
+        asize = 2 * DSIZE;
     else
-    {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
+        asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+
+    /* Search the free list for a fit */
+    if ((bp = find_fit(asize)) != NULL) {
+        place(bp, asize);
+        return bp;
     }
+
+    /* No fit found. Get more memory and place the block */
+    extendsize = MAX(asize, CHUNKSIZE);
+    if ((bp = extend_heap(extendsize / WSIZE)) == NULL)
+        return NULL;
+    place(bp, asize);
+    return bp;
 }
 
 /*
@@ -175,35 +203,52 @@ static void *coalesce(void *bp)
     return bp;
 }
 
+static void *find_fit(size_t asize)
+{
+	/* First-fit search */
+	void *bp;
+
+	for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+            return bp;
+        }
+	}
+	return NULL; // No fit
+}
+
+static void place(void *bp, size_t asize)
+{
+	size_t csize = GET_SIZE(HDRP(bp));
+
+	if ((csize - asize) >= (2*DSIZE)) {
+        PUT(HDRP(bp), PACK(asize, 1));
+        PUT(FTRP(bp), PACK(asize, 1));
+        bp = NEXT_BLKP(bp);
+        PUT(HDRP(bp), PACK(csize-asize, 0));
+        PUT(FTRP(bp), PACK(csize-asize, 0));
+    }
+	else {
+        PUT(HDRP(bp), PACK(csize, 1));
+        PUT(FTRP(bp), PACK(csize, 1));
+	}
+}
+
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void *mm_malloc(size_t size)
+void *mm_realloc(void *ptr, size_t size)
 {
-    size_t asize;      /* Adjusted block size */
-    size_t extendsize; /* Amount to extend heap if no fit */
-    char *bp;
+    void *oldptr = ptr;
+    void *newptr;
+    size_t copySize;
 
-    /* Ignore spurious requests */
-    if (size == 0)
+    newptr = mm_malloc(size);
+    if (newptr == NULL)
         return NULL;
-
-    /* Adjust block size to include overhead and alignment reqs. */
-    if (size <= DSIZE)
-        asize = 2 * DSIZE;
-    else
-        asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
-
-    /* Search the free list for a fit */
-    if ((bp = find_fit(asize)) != NULL) {
-        place(bp, asize);
-        return bp;
-    }
-
-    /* No fit found. Get more memory and place the block */
-    extendsize = MAX(asize, CHUNKSIZE);
-    if ((bp = extend_heap(extendsize / WSIZE)) == NULL)
-        return NULL;
-    place(bp, asize);
-    return bp;
+    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+    if (size < copySize)
+        copySize = size;
+    memcpy(newptr, oldptr, copySize);
+    mm_free(oldptr);
+    return newptr;
 }
