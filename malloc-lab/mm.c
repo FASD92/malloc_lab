@@ -256,7 +256,7 @@ static void place(void *bp, size_t asize)
     size_t csize = GET_SIZE(HDRP(bp));
     remove_free_block(bp, csize);
 
-    if ((csize - asize) >= (2 * DSIZE)) {
+    if ((csize - asize) >= (3 * DSIZE)) {
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
         void *next_bp = NEXT_BLKP(bp);
