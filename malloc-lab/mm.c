@@ -223,11 +223,19 @@ static void remove_free_block(void *bp)
 static void *find_fit(size_t asize)
 {
     void *bp;
+    void *best_bp = NULL;
+    size_t best_size = (size_t)-1;
+
     for (bp = free_listp; bp != NULL; bp = NEXT_FREE(bp)) {
-        if (asize <= GET_SIZE(HDRP(bp)))
-            return bp;
+        size_t size = GET_SIZE(HDRP(bp));
+        if (asize <= size) {
+            if (size < best_size) {
+                best_bp = bp;
+                best_size = size;
+            }
+        }
     }
-    return NULL;
+    return best_bp;
 }
 
 /* 블록 할당 */
