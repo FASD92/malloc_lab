@@ -9,7 +9,7 @@
 #define WSIZE 8
 #define DSIZE 16
 #define CHUNKSIZE (1 << 12)
-#define LISTLIMIT 20
+#define LISTLIMIT 10
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define PACK(size, alloc) ((size) | (alloc))
