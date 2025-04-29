@@ -70,13 +70,16 @@ int mm_init(void)
 
 static int find_list_index(size_t size)
 {
-    int idx = 0;
-    size_t s = size;
-    while ((s > 1) && (idx < LISTLIMIT - 1)) {
-        s >>= 1;
-        idx++;
-    }
-    return idx;
+    if (size <= 16) return 0;
+    else if (size <= 32) return 1;
+    else if (size <= 64) return 2;
+    else if (size <= 128) return 3;
+    else if (size <= 256) return 4;
+    else if (size <= 512) return 5;
+    else if (size <= 1024) return 6;
+    else if (size <= 2048) return 7;
+    else if (size <= 4096) return 8;
+    else return 9;
 }
 
 static void insert_free_block(void *bp, size_t size)
