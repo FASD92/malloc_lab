@@ -307,25 +307,19 @@ static void remove_free_block(void *bp)
         PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
 }
 
-/* find_fit 함수 수정 */
 static void *find_fit(size_t asize)
 {
     int idx = find_list_index(asize);
-    void *best_bp = NULL;
-    size_t best_size = (size_t)-1;
 
     for (int i = idx; i < 20; i++) {
         for (void *bp = segregated_free_lists[i]; bp != NULL; bp = NEXT_FREE(bp)) {
-            size_t bsize = GET_SIZE(HDRP(bp));
-            if (asize <= bsize && (bsize < best_size)) {
-                best_size = bsize;
-                best_bp = bp;
+            if (GET_SIZE(HDRP(bp)) >= asize) {
+                return bp; // 첫 번째로 맞는 블록을 바로 반환
             }
         }
-        if (best_bp != NULL)
-            break;
     }
-    return best_bp;
+
+    return NULL; // 못 찾으면 NULL
 }
 
 /* 블록 할당 */
