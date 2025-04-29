@@ -173,83 +173,83 @@ void mm_free(void *bp)
         coalesce(bp);
     }
 
-    void *mm_realloc(void *ptr, size_t size)
-    {
-        if (ptr == NULL)
-            return mm_malloc(size);
-        if (size == 0) {
-            mm_free(ptr);
-            return NULL;
-        }
-    
-        void *newptr;
-        size_t oldsize = GET_SIZE(HDRP(ptr));
-        size_t asize;
-    
-        // 새 size를 8바이트 정렬에 맞추기
-        if (size <= DSIZE)
-            asize = 2 * DSIZE;
-        else
-            asize = DSIZE * ((size + (DSIZE)+(DSIZE - 1)) / DSIZE);
-    
-        // case 1. 새 요청이 현재 블록보다 작거나 같을 때
-        if (asize <= oldsize) {
-            size_t remaining = oldsize - asize;
-            if (remaining >= (2 * DSIZE)) { // 최소 블록 크기 이상이면 split
-                PUT(HDRP(ptr), PACK(asize, 1));
-                PUT(FTRP(ptr), PACK(asize, 1));
-    
-                void *next_bp = NEXT_BLKP(ptr);
-                PUT(HDRP(next_bp), PACK(remaining, 0));
-                PUT(FTRP(next_bp), PACK(remaining, 0));
-                NEXT_FREE(next_bp) = NULL;
-                PREV_FREE(next_bp) = NULL;
-                insert_free_block(next_bp);
-            }
-            return ptr;
-        }
-    
-        // case 2. 새 요청이 현재 블록보다 크고, next block이 free 블록이면 병합 시도
-        void *next_bp = NEXT_BLKP(ptr);
-        size_t next_alloc = GET_ALLOC(HDRP(next_bp));
-        size_t next_size = GET_SIZE(HDRP(next_bp));
-    
-        if (!next_alloc && (oldsize + next_size) >= asize) {
-            remove_free_block(next_bp);
-    
-            size_t total_size = oldsize + next_size;
-            size_t remaining = total_size - asize;
-    
-            if (remaining >= (2 * DSIZE)) { // 합친 후에도 split 가능
-                PUT(HDRP(ptr), PACK(asize, 1));
-                PUT(FTRP(ptr), PACK(asize, 1));
-    
-                void *split_bp = NEXT_BLKP(ptr);
-                PUT(HDRP(split_bp), PACK(remaining, 0));
-                PUT(FTRP(split_bp), PACK(remaining, 0));
-                NEXT_FREE(split_bp) = NULL;
-                PREV_FREE(split_bp) = NULL;
-                insert_free_block(split_bp);
-            } else {
-                PUT(HDRP(ptr), PACK(total_size, 1));
-                PUT(FTRP(ptr), PACK(total_size, 1));
-            }
-    
-            return ptr;
-        }
-    
-        // case 3. 확장할 수 없으면 새로 malloc
-        newptr = mm_malloc(size);
-        if (newptr == NULL)
-            return NULL;
-    
-        size_t copySize = oldsize - DSIZE;
-        if (size < copySize)
-            copySize = size;
-        memcpy(newptr, ptr, copySize);
+void *mm_realloc(void *ptr, size_t size)
+{
+    if (ptr == NULL)
+        return mm_malloc(size);
+    if (size == 0) {
         mm_free(ptr);
-        return newptr;
+        return NULL;
     }
+
+    void *newptr;
+    size_t oldsize = GET_SIZE(HDRP(ptr));
+    size_t asize;
+
+    // 새 size를 8바이트 정렬에 맞추기
+    if (size <= DSIZE)
+        asize = 2 * DSIZE;
+    else
+        asize = DSIZE * ((size + (DSIZE)+(DSIZE - 1)) / DSIZE);
+
+    // case 1. 새 요청이 현재 블록보다 작거나 같을 때
+    if (asize <= oldsize) {
+        size_t remaining = oldsize - asize;
+        if (remaining >= (2 * DSIZE)) { // 최소 블록 크기 이상이면 split
+            PUT(HDRP(ptr), PACK(asize, 1));
+            PUT(FTRP(ptr), PACK(asize, 1));
+
+            void *next_bp = NEXT_BLKP(ptr);
+            PUT(HDRP(next_bp), PACK(remaining, 0));
+            PUT(FTRP(next_bp), PACK(remaining, 0));
+            NEXT_FREE(next_bp) = NULL;
+            PREV_FREE(next_bp) = NULL;
+            insert_free_block(next_bp);
+        }
+        return ptr;
+    }
+
+    // case 2. 새 요청이 현재 블록보다 크고, next block이 free 블록이면 병합 시도
+    void *next_bp = NEXT_BLKP(ptr);
+    size_t next_alloc = GET_ALLOC(HDRP(next_bp));
+    size_t next_size = GET_SIZE(HDRP(next_bp));
+
+    if (!next_alloc && (oldsize + next_size) >= asize) {
+        remove_free_block(next_bp);
+
+        size_t total_size = oldsize + next_size;
+        size_t remaining = total_size - asize;
+
+        if (remaining >= (2 * DSIZE)) { // 합친 후에도 split 가능
+            PUT(HDRP(ptr), PACK(asize, 1));
+            PUT(FTRP(ptr), PACK(asize, 1));
+
+            void *split_bp = NEXT_BLKP(ptr);
+            PUT(HDRP(split_bp), PACK(remaining, 0));
+            PUT(FTRP(split_bp), PACK(remaining, 0));
+            NEXT_FREE(split_bp) = NULL;
+            PREV_FREE(split_bp) = NULL;
+            insert_free_block(split_bp);
+        } else {
+            PUT(HDRP(ptr), PACK(total_size, 1));
+            PUT(FTRP(ptr), PACK(total_size, 1));
+        }
+
+        return ptr;
+    }
+
+    // case 3. 확장할 수 없으면 새로 malloc
+    newptr = mm_malloc(size);
+    if (newptr == NULL)
+        return NULL;
+
+    size_t copySize = oldsize - DSIZE;
+    if (size < copySize)
+        copySize = size;
+    memcpy(newptr, ptr, copySize);
+    mm_free(ptr);
+    return newptr;
+}
 
 /* 가용 리스트에 블록 추가 */
 static void insert_free_block(void *bp)
@@ -273,15 +273,20 @@ static void remove_free_block(void *bp)
         PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
 }
 
-/* first-fit 검색 */
 static void *find_fit(size_t asize)
 {
     void *bp;
+    void *best_bp = NULL;
+    size_t best_size = (size_t)-1;
+
     for (bp = free_listp; bp != NULL; bp = NEXT_FREE(bp)) {
-        if (asize <= GET_SIZE(HDRP(bp)))
-            return bp;
+        size_t bsize = GET_SIZE(HDRP(bp));
+        if (asize <= bsize && (bsize < best_size)) {
+            best_size = bsize;
+            best_bp = bp;
+        }
     }
-    return NULL;
+    return best_bp;
 }
 
 /* 블록 할당 */
