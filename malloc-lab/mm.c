@@ -85,11 +85,30 @@ static int find_list_index(size_t size)
 static void insert_free_block(void *bp, size_t size)
 {
     int idx = find_list_index(size);
-    NEXT_FREE(bp) = segregated_free_lists[idx];
-    PREV_FREE(bp) = NULL;
-    if (segregated_free_lists[idx] != NULL)
-        PREV_FREE(segregated_free_lists[idx]) = bp;
-    segregated_free_lists[idx] = bp;
+    void *curr = segregated_free_lists[idx];
+    void *prev = NULL;
+
+    /* 크기순 정렬 삽입 */
+    while (curr != NULL && GET_SIZE(HDRP(curr)) < size) {
+        prev = curr;
+        curr = NEXT_FREE(curr);
+    }
+
+    if (prev == NULL) {
+        /* 리스트 맨 앞에 삽입 */
+        NEXT_FREE(bp) = segregated_free_lists[idx];
+        PREV_FREE(bp) = NULL;
+        if (segregated_free_lists[idx] != NULL)
+            PREV_FREE(segregated_free_lists[idx]) = bp;
+        segregated_free_lists[idx] = bp;
+    } else {
+        /* prev와 curr 사이에 삽입 */
+        NEXT_FREE(prev) = bp;
+        PREV_FREE(bp) = prev;
+        NEXT_FREE(bp) = curr;
+        if (curr != NULL)
+            PREV_FREE(curr) = bp;
+    }
 }
 
 static void remove_free_block(void *bp, size_t size)
