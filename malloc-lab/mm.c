@@ -171,7 +171,7 @@ void mm_free(void *bp)
 
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
-    coalesce(bp);
+    insert_free_block(bp);
 }
 
 void *mm_realloc(void *ptr, size_t size)
